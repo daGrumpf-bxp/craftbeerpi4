@@ -77,11 +77,10 @@ class SatelliteController:
                 # Cancel
                 self.logger.warning("MQTT Listening Cancelled")
                 break
-            except Exception as e:
-                self.logger.error("MQTT General Exception: {}".format(e))
-                break
             except aiomqtt.MqttError as e:
-                self.logger.error("MQTT Exception: {}".format(e))
+                self.logger.warning("MQTT disconnected: {}. Reconnecting in 5s".format(e))
+            except Exception as e:
+                self.logger.error("MQTT General Exception: {}. Reconnecting in 5s".format(e))
 
             await asyncio.sleep(5)
 
