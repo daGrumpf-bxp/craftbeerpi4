@@ -51,11 +51,31 @@ class MQTTSensor(CBPiSensor):
 
     def __init__(self, cbpi, id, props):
         super(MQTTSensor, self).__init__(cbpi, id, props)
+        self.sensor = self.get_sensor(self.id)
         self.Topic = self.props.get("Topic", None)
+        if self.Topic is None:
+            self.cbpi.notify(
+                "MQTTSensor",
+                "Sensor '"
+                + str(self.sensor.name)
+                + "' has no topic defined. Please define a topic in the sensor settings.",
+                NotificationType.WARNING,
+                action=[NotificationAction("OK", self.Confirm)],
+            )   
+        else:
+            self.subscribed = self.cbpi.satellite.subscribe(self.Topic, self.on_message)
         self.payload_text = self.props.get("PayloadDictionary", None)
-        if self.payload_text != None:
+        if self.payload_text is not None and self.payload_text != "":
             self.payload_text = self.payload_text.split(".")
-        self.subscribed = self.cbpi.satellite.subscribe(self.Topic, self.on_message)
+        else:
+            self.cbpi.notify(
+                "MQTTSensor",
+                "Sensor '"
+                + str(self.sensor.name)
+                + "' has no PayloadDictionary defined. Please define a PayloadDictionary in the sensor settings.",
+                NotificationType.WARNING,
+                action=[NotificationAction("OK", self.Confirm)],
+            )
         self.value: float = 999
         self.timeout = int(self.props.get("Timeout", 60))
         self.temprange = float(self.props.get("TempRange", 0))
@@ -64,7 +84,6 @@ class MQTTSensor(CBPiSensor):
         self.nextchecktime = self.starttime + self.timeout
         self.lastdata = time.time()
         self.lastlog = 0
-        self.sensor = self.get_sensor(self.id)
         self.reducedfrequency = int(self.props.get("ReducedLogging", 60))
         if self.reducedfrequency < 0:
             self.reducedfrequency = 0
@@ -235,12 +254,32 @@ class MQTTSensorOffset(CBPiSensor):
 
     def __init__(self, cbpi, id, props):
         super(MQTTSensorOffset, self).__init__(cbpi, id, props)
+        self.sensor = self.get_sensor(self.id)
         self.Topic = self.props.get("Topic", None)
+        if self.Topic is None:
+            self.cbpi.notify(
+                "MQTTSensor",
+                "Sensor '"
+                + str(self.sensor.name)
+                + "' has no Topic defined. Please define a Topic in the sensor settings.",
+                NotificationType.WARNING,
+                action=[NotificationAction("OK", self.Confirm)],
+            )
+        else:
+            self.subscribed = self.cbpi.satellite.subscribe(self.Topic, self.on_message)
         self.offset = float(self.props.get("Offset", 0))
         self.payload_text = self.props.get("PayloadDictionary", None)
-        if self.payload_text != None:
+        if self.payload_text != None and self.payload_text != "":
             self.payload_text = self.payload_text.split(".")
-        self.subscribed = self.cbpi.satellite.subscribe(self.Topic, self.on_message)
+        else:
+            self.cbpi.notify(
+                "MQTTSensor",
+                "Sensor '"
+                + str(self.sensor.name)
+                + "' has no PayloadDictionary defined. Please define a PayloadDictionary in the sensor settings.",
+                NotificationType.WARNING,
+                action=[NotificationAction("OK", self.Confirm)],
+            )
         self.value: float = 999
         self.timeout = int(self.props.get("Timeout", 60))
         self.temprange = float(self.props.get("TempRange", 0))
@@ -249,7 +288,6 @@ class MQTTSensorOffset(CBPiSensor):
         self.nextchecktime = self.starttime + self.timeout
         self.lastdata = time.time()
         self.lastlog = 0
-        self.sensor = self.get_sensor(self.id)
         self.reducedfrequency = int(self.props.get("ReducedLogging", 60))
         if self.reducedfrequency < 0:
             self.reducedfrequency = 0
@@ -287,8 +325,8 @@ class MQTTSensorOffset(CBPiSensor):
         pass
 
     async def on_message(self, message):
-        val = json.loads(message.payload.decode())
         try:
+            val = json.loads(message.payload.decode())
             if self.payload_text is not None:
                 for key in self.payload_text:
                     val = val.get(key, None)
