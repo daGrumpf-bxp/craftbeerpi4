@@ -73,13 +73,18 @@ class CBPiBase(metaclass=ABCMeta):
         from cbpi.api.dataclasses import NotificationType
 
         value = self.get_sensor_usable_value(sensor_id)
-        lost = getattr(self, "_control_value_lost", False)
+        # tracked per sensor: a logic reading two sensors (mash tun and RIMS,
+        # beer and chamber) would otherwise notify lost/back on every loop
+        if not hasattr(self, "_control_value_lost"):
+            self._control_value_lost = set()
+        lost_sensors = self._control_value_lost
+        lost = sensor_id in lost_sensors
         if value is None:
             for actor in actors:
                 if actor:
                     await self.actor_off(actor)
             if not lost:
-                self._control_value_lost = True
+                lost_sensors.add(sensor_id)
                 sensor = self.cbpi.sensor.find_by_id(sensor_id)
                 name = sensor.name if sensor is not None else sensor_id
                 logging.warning(
@@ -91,7 +96,7 @@ class CBPiBase(metaclass=ABCMeta):
                     NotificationType.ERROR,
                 )
         elif lost:
-            self._control_value_lost = False
+            lost_sensors.discard(sensor_id)
             self.cbpi.notify(owner, "Sensor reading is back, control resumed.", NotificationType.INFO)
         return value
 

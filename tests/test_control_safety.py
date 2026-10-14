@@ -201,6 +201,29 @@ class HysteresisFailSafeTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("heater", cbpi.switched_on)
         self.assertEqual(cbpi.notifications, [])
 
+    async def test_two_sensors_lost_and_back_notify_once_each(self):
+        cbpi = FakeCbpi()
+        mash = add_sensor(cbpi, "mash", stale_after=math.inf)
+        rims = add_sensor(cbpi, "rims", stale_after=math.inf)
+        mash.value = 65.0
+        mash.push_update(mash.value)
+        logic = self.make_logic(cbpi, mash)
+        # a logic reading two sensors, one of them without a reading: the
+        # lost state is per sensor, so the good one must not clear it
+        for _ in range(3):
+            self.assertEqual(await logic.get_control_value("mash", ["heater"], "HLT"), 65.0)
+            self.assertIsNone(await logic.get_control_value("rims", ["heater"], "HLT"))
+        self.assertEqual([n[2] for n in cbpi.notifications], [NotificationType.ERROR])
+        rims.value = 70.0
+        rims.push_update(rims.value)
+        for _ in range(3):
+            await logic.get_control_value("mash", ["heater"], "HLT")
+            await logic.get_control_value("rims", ["heater"], "HLT")
+        self.assertEqual(
+            [n[2] for n in cbpi.notifications],
+            [NotificationType.ERROR, NotificationType.INFO],
+        )
+
     async def test_logic_crash_switches_off_and_notifies(self):
         class Crashing(CBPiKettleLogic):
             async def run(self):
