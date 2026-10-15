@@ -1,0 +1,3 @@
+-r requirements.txt
+pytest-aiohttp
+coverage==7.16.0
