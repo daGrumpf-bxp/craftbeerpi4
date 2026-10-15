@@ -62,6 +62,20 @@ from voluptuous.schema_builder import message
 
 logger = logging.getLogger(__name__)
 
+def auth_middleware(policy):
+    """
+    The middleware of aiohttp_auth, written as a new-style middleware: the
+    library only ships the old factory form, deprecated by aiohttp.
+    """
+    @web.middleware
+    async def middleware(request, handler):
+        request[auth.auth.POLICY_KEY] = policy
+        response = await handler(request)
+        await policy.process_response(request, response)
+        return response
+
+    return middleware
+
 @web.middleware
 async def error_middleware(request, handler):
     try:
@@ -108,7 +122,7 @@ class CraftBeerPi:
 
         policy = auth.SessionTktAuthentication(urandom(32), 60, include_ip=True)
         middlewares = [web.normalize_path_middleware(), session_middleware(EncryptedCookieStorage(urandom(32))),
-                       auth.auth_middleware(policy), error_middleware]
+                       auth_middleware(policy), error_middleware]
         # max upload size increased to 5 Mb. Default is 1 Mb -> config and svg upload
         self.app = web.Application(middlewares=middlewares, client_max_size=5*1024*1024)
         self.app["cbpi"] = self
@@ -116,7 +130,8 @@ class CraftBeerPi:
         self._setup_shutdownhook()
         self.initializer = []
 
-        self.bus = CBPiEventBus(self.app.loop, self)
+        # the application has no loop before it starts: the bus picks its own
+        self.bus = CBPiEventBus(None, self)
         self.job = JobController(self)
         self.config = ConfigController(self)
         self.ws = CBPiWebSocket(self)
