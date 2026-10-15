@@ -125,7 +125,7 @@ class SatelliteController:
         try:
             topic_key = str(message.topic).split("/")
             await self.cbpi.actor.on(topic_key[2])
-            self.logger.warning("Processed actor {} on via mqtt".format(topic_key[2]))
+            self.logger.info("Processed actor {} on via mqtt".format(topic_key[2]))
         except Exception as e:
             self.logger.warning("Failed to process actor on via mqtt: {}".format(e))
 
@@ -133,7 +133,7 @@ class SatelliteController:
         try:
             topic_key = str(message.topic).split("/")
             await self.cbpi.actor.off(topic_key[2])
-            self.logger.warning("Processed actor {} off via mqtt".format(topic_key[2]))
+            self.logger.info("Processed actor {} off via mqtt".format(topic_key[2]))
         except Exception as e:
             self.logger.warning("Failed to process actor off via mqtt: {}".format(e))
 
