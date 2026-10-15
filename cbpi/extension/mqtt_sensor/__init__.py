@@ -78,6 +78,7 @@ class MQTTSensor(CBPiSensor):
                 action=[NotificationAction("OK", self.Confirm)],
             )
         self.value: float = 999
+        self.ignoring_invalid = False
         self.timeout = int(self.props.get("Timeout", 60))
         # no reading is usable for control before the first message, nor once
         # the sensor stayed silent longer than its timeout
@@ -137,12 +138,23 @@ class MQTTSensor(CBPiSensor):
                     # an ESP publishes nan when its probe is unplugged: keep
                     # the shown value but stop control from using it
                     self.value_time = None
+                    # once per loss: an ESP keeps publishing nan every few
+                    # seconds while its probe is unplugged
+                    if not self.ignoring_invalid:
+                        self.ignoring_invalid = True
+                        logging.warning(
+                            "MQTTSensor {} ignored non-numeric value {}".format(
+                                self.sensor.name, val
+                            )
+                        )
+                    return
+                if self.ignoring_invalid:
+                    self.ignoring_invalid = False
                     logging.warning(
-                        "MQTTSensor {} ignored non-numeric value {}".format(
-                            self.sensor.name, val
+                        "MQTTSensor {} receives numeric values again".format(
+                            self.sensor.name
                         )
                     )
-                    return
                 self.value = reading
                 self.push_update(self.value)
                 if self.reducedlogging == True:
@@ -296,6 +308,7 @@ class MQTTSensorOffset(CBPiSensor):
                 action=[NotificationAction("OK", self.Confirm)],
             )
         self.value: float = 999
+        self.ignoring_invalid = False
         self.timeout = int(self.props.get("Timeout", 60))
         # no reading is usable for control before the first message, nor once
         # the sensor stayed silent longer than its timeout
@@ -355,12 +368,23 @@ class MQTTSensorOffset(CBPiSensor):
                     # an ESP publishes nan when its probe is unplugged: keep
                     # the shown value but stop control from using it
                     self.value_time = None
+                    # once per loss: an ESP keeps publishing nan every few
+                    # seconds while its probe is unplugged
+                    if not self.ignoring_invalid:
+                        self.ignoring_invalid = True
+                        logging.warning(
+                            "MQTTSensor {} ignored non-numeric value {}".format(
+                                self.sensor.name, val
+                            )
+                        )
+                    return
+                if self.ignoring_invalid:
+                    self.ignoring_invalid = False
                     logging.warning(
-                        "MQTTSensor {} ignored non-numeric value {}".format(
-                            self.sensor.name, val
+                        "MQTTSensor {} receives numeric values again".format(
+                            self.sensor.name
                         )
                     )
-                    return
                 self.value = reading
                 self.push_update(self.value)
                 if self.reducedlogging == True:

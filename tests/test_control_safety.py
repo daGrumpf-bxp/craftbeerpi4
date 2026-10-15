@@ -160,6 +160,46 @@ class SensorCrashTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("probe", cbpi.notifications[0][1])
 
 
+class MQTTSensorNaNTest(unittest.IsolatedAsyncioTestCase):
+
+    async def test_nan_is_logged_once_per_loss(self):
+        from cbpi.extension.mqtt_sensor import MQTTSensor
+
+        sensor = MQTTSensor.__new__(MQTTSensor)
+        sensor.cbpi = FakeCbpi()
+        sensor.id = "s"
+        sensor.sensor = SimpleNamespace(name="ferm")
+        sensor.payload_text = None
+        sensor.value = 999
+        sensor.value_time = None
+        sensor.temprange = 0
+        sensor.ignoring_invalid = False
+        sensor.reducedlogging = False
+        sensor.timeout = 0
+        sensor.log_data = lambda value: None
+
+        def message(payload):
+            return SimpleNamespace(payload=payload.encode())
+
+        with self.assertLogs(level="WARNING") as logs:
+            for _ in range(5):
+                await sensor.on_message(message("NaN"))
+            await sensor.on_message(message("12.5"))
+            await sensor.on_message(message("12.6"))
+            await sensor.on_message(message("NaN"))
+        # an ESP publishes nan every few seconds while its probe is unplugged
+        messages = [r.getMessage() for r in logs.records if "MQTTSensor" in r.getMessage()]
+        self.assertEqual(
+            messages,
+            [
+                "MQTTSensor ferm ignored non-numeric value nan",
+                "MQTTSensor ferm receives numeric values again",
+                "MQTTSensor ferm ignored non-numeric value nan",
+            ],
+        )
+        self.assertEqual(sensor.value, 12.6)
+
+
 class HysteresisFailSafeTest(unittest.IsolatedAsyncioTestCase):
 
     def make_logic(self, cbpi, sensor):
