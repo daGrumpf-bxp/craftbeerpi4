@@ -1,4 +1,5 @@
 import asyncio
+import threading
 
 from cbpi.eventbus import CBPiEventBus
 
@@ -57,3 +58,44 @@ def test_sync_fire_from_the_loop():
 
     asyncio.run(main())
     assert received == ["job/x/done"]
+
+
+def test_sync_fire_from_a_thread():
+    bus = make_bus_outside_the_loop()
+    received = []
+
+    async def handler(topic, **kwargs):
+        received.append(topic)
+
+    async def main():
+        # plugins register at startup, inside the loop
+        bus.register("sensor/+/data", handler)
+        thread = threading.Thread(target=bus.sync_fire, args=("sensor/1/data",))
+        thread.start()
+        await asyncio.get_running_loop().run_in_executor(None, thread.join)
+        await asyncio.sleep(0.05)
+
+    asyncio.run(main())
+    assert received == ["sensor/1/data"]
+
+
+def test_sync_fire_from_a_thread_before_the_loop_runs():
+    bus = make_bus_outside_the_loop()
+
+    async def handler(topic, **kwargs):
+        pass
+
+    bus.register("sensor/+/data", handler)
+    errors = []
+
+    def fire():
+        try:
+            bus.sync_fire("sensor/1/data")
+        except Exception as e:
+            errors.append(e)
+
+    thread = threading.Thread(target=fire)
+    thread.start()
+    thread.join()
+    # dropped with a warning, not raised into the plugin's thread
+    assert errors == []
